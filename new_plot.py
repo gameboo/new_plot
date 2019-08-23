@@ -60,11 +60,29 @@ common.add_argument(
   'csv', type = str, nargs = '+', metavar = 'CSV_FILE',
   help = "CSV_FILE(s) to used"
 )
-#common.add_argument(
-#  '--filter-in', type = str, nargs = 2, action = 'append',
-#  metavar = ('CATEGORY','NAME'),
-#  help = "Keeps the rows with a CATEGORY of NAME. " + showcat
-#)
+
+class BuildFilter(ap.Action):
+  def __init__(self, option_strings, dest, nargs, **kwargs):
+    if nargs is not 2:
+      raise ValueError("nargs not allowed")
+    super(BuildFilter, self).__init__(option_strings, dest, nargs, **kwargs)
+  def __call__(self, parser, namespace, values, option_string=None):
+    filters = getattr(namespace, self.dest)
+    if filters:
+      if values[0] in filters.keys():
+        filters[values[0]].append(values[1])
+      else:
+        filters[values[0]] = [values[1]]
+    else:
+      filters = { values[0]: [values[1]] }
+    setattr(namespace, self.dest, filters)
+
+common.add_argument(
+  '--filter-in', type = str, nargs = 2, action = BuildFilter,
+  metavar = ('CATEGORY','NAME'),
+  help = "Keeps ONLY the rows with a CATEGORY of NAME. " + showcat
+)
+
 #common.add_argument(
 #  '--filter-out', type = str, nargs = 2, action = 'append',
 #  metavar = ('CATEGORY','NAME'),
@@ -146,17 +164,67 @@ if __name__ == "__main__":
     dfs.append(pd.read_csv(f))
   df = pd.concat(dfs)
   # identify categories
+  pre_filter_categories = find_categories(df)
+
+  # sanitize filter args
+  ##############################################################################
+  pre_filter_categories_keys = list(pre_filter_categories.keys())
+  if args.filter_in:
+    for c, ns in args.filter_in.items():
+      if c not in pre_filter_categories_keys:
+        print("'{:s}' is not a valid category for use with --filter-in. Please select from {:s}".format(c, str(pre_filter_categories_keys)))
+        exit(-1)
+      for n in ns:
+        if n not in pre_filter_categories[c]:
+          print("'{:s}' is not a valid name for use with --filter-in with the category '{:s}'. Please select from {:s}".format(n, c, str(pre_filter_categories[c])))
+          exit(-1)
+  #if args.filter_out:
+  #  for c, n in args.filter_in:
+  #    if c not in pre_filter_categories_keys:
+  #      print("'{:s}' is not a valid category for use with --filter-out. Please select from {:s}".format(c, str(pre_filter_categories_keys)))
+  #      exit(-1)
+  #    if n not in pre_filter_categories[c]:
+  #      print("'{:s}' is not a valid name for use with --filter-out with the category '{:s}'. Please select from {:s}".format(n, c, str(pre_filter_categories[c])))
+  #      exit(-1)
+
+  # filter dataframe and evaluate remaining categories / metrics
+  ##############################################################################
+  if args.filter_in:
+    def build_bool_frames (c, ns):
+      in_cat_frames = [df[c] == n for n in ns]
+      cat_frames = in_cat_frames[0]
+      for frame in in_cat_frames[1:]:
+        cat_frames = cat_frames | frame
+      return cat_frames
+    bool_frames = [build_bool_frames(c, ns) for c, ns in args.filter_in.items()]
+    samples = bool_frames[0]
+    for frame in bool_frames[1:]:
+      samples = samples & frame
+    df = df[samples]
+  # identify categories
   categories = find_categories(df)
-  # set categories on dataframe
-  df = categorize_dataframe(df, categories)
   # identify metrics
   metrics = find_metrics(df)
-  # filters dataframe
+  # categorize df
+  df = categorize_dataframe(df, categories)
 
+  # sanitize group/metric args
+  ##############################################################################
+  categories_keys = list(categories.keys())
+  if args.metric:
+    for m in args.metric:
+      if m not in metrics:
+        print("'{:s}' is not a valid metric for use with --metric. Please select from {:s}".format(m, metrics))
+        exit(-1)
+  if args.group_by:
+    for c in args.group_by:
+      if c not in categories_keys:
+        print("'{:s}' is not a valid category for use with --group-by. Please select from {:s}".format(c, str(categories_keys)))
+        exit(-1)
 
+  #print(df)
   #sample2 = categorize_dataframe(sample, find_categories(sample))
   #sample2.groupby('target-arch-cpu').mean()['cycles'].plot.bar()
-
 
   # identify a subcommand
   ##############################################################################
