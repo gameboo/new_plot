@@ -80,7 +80,10 @@ class BuildFilter(ap.Action):
 common.add_argument(
   '--filter-in', type = str, nargs = 2, action = BuildFilter,
   metavar = ('CATEGORY','NAME'),
-  help = "Keeps ONLY the rows with a CATEGORY of NAME. " + showcat
+  help = "Keeps ONLY the rows with a CATEGORY of NAME. If called multiple times"
+         " for a same CATEGORY, keeps the rows with any of the specified NAMEs."
+         "If called multiple times with different CATEGORies, keeps the rows "
+         " with all specified NAMEs for each CATEGORY. " + showcat
 )
 
 #common.add_argument(
@@ -93,7 +96,8 @@ common.add_argument(
 bars = ap.ArgumentParser(add_help=False)
 bars.add_argument(
   '--group-by', default = None, type = str, action = 'append',
-  help = "A category to group by. Repeated calls will group by categories in "
+  metavar = "CATEGORY",
+  help = "A CATEGORY to group by. Repeated calls will group by CATEGORies in "
          "the order of the calls. " + showcat
 )
 bars.add_argument(
