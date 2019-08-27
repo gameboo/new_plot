@@ -215,12 +215,12 @@ if __name__ == "__main__":
   # sanitize group/metric args
   ##############################################################################
   categories_keys = list(categories.keys())
-  if args.metric:
+  if hasattr(args, 'metric') and args.metric:
     for m in args.metric:
       if m not in metrics:
         print("'{:s}' is not a valid metric for use with --metric. Please select from {:s}".format(m, metrics))
         exit(-1)
-  if args.group_by:
+  if hasattr(args, 'group_by') and args.group_by:
     for c in args.group_by:
       if c not in categories_keys:
         print("'{:s}' is not a valid category for use with --group-by. Please select from {:s}".format(c, str(categories_keys)))
